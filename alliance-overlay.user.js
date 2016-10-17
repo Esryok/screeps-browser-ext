@@ -3,14 +3,41 @@
 // ==UserScript==
 // @name         Screeps alliance overlay
 // @namespace    https://screeps.com/
-// @version      0.1
+// @version      0.2.2
 // @author       James Cook
-// @match        https://screeps.com/a/
+// @include      https://screeps.com/a/
 // @run-at       document-ready
+// @downloadUrl  https://github.com/Esryok/screeps-browser-ext/raw/master/alliance-overlay.user.js
 // @grant        GM_xmlhttpRequest
 // @require      http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js
 // @connect      www.leagueofautomatednations.com
 // ==/UserScript==
+
+// Keep this in sync with http://www.leagueofautomatednations.com/static/js/ScreepsMap.js
+// Could just require it, but that's a lot of other baggage
+const DEFAULT_COLORS = [
+    '#FFFF00',
+    '#63f0e5',
+    '#00FF00',
+    '#C055DD',
+    '#FF66AA',
+    '#D00000',
+    '#FF8500',
+    '#0055DD',
+    '#54D579',
+    '#FF00FF',
+    '#FD2222',
+    '#FFA500',
+    '#CCFF88',
+    '#0088AA',
+    '#00EE88',
+    '#BB00BB',
+    '#FF33EE',
+    '#FF0000',
+    '#FFCC44',
+    '#DDA0DD',
+    '#54D579',
+];
 
 const loanBaseUrl = "http://www.leagueofautomatednations.com";
 
@@ -23,8 +50,18 @@ function getAllianceLogo(allianceKey) {
     }
 }
 
+function getAllianceColor(allianceKey) {
+    let keys = Object.keys(allianceData);
+    return DEFAULT_COLORS[keys.indexOf(allianceKey)];
+}
+
 // query for alliance data from the LOAN site
 function ensureAllianceData(callback) {
+    if (allianceData) {
+        if (callback) callback();
+        return;
+    }
+
     GM_xmlhttpRequest({
         method: "GET",
         url: (loanBaseUrl + "/alliances.js"),
@@ -57,7 +94,14 @@ function exposeAllianceDataForAngular() {
 
         worldMap.allianceData = allianceData;
         worldMap.userAlliance = userAlliance;
+
+        recalculateAllianceOverlay();
     });
+
+    for (let allianceKey in allianceData) {
+        addStyle(".alliance-" + allianceKey + " { background-color: " + getAllianceColor(allianceKey) + " }");
+        addStyle(".alliance-logo-3.alliance-" + allianceKey + " { background-image: url('" + getAllianceLogo(allianceKey) + "') }");
+    }
 }
 
 // inject a new CSS style
@@ -92,6 +136,8 @@ function bindAllianceSetting() {
 
         if (worldMap.displayOptions.alliances && !worldMap.userAlliances) {
             ensureAllianceData(exposeAllianceDataForAngular);
+        } else {
+            $('.alliance-logo').remove();
         }
     };
 
@@ -107,6 +153,7 @@ function bindAllianceSetting() {
 
     if (alliancesEnabled) {
         ensureAllianceData(exposeAllianceDataForAngular);
+        recalculateAllianceOverlay();
     }
 }
 
@@ -147,6 +194,98 @@ function addAllianceToInfoOverlay() {
     $(compiledContent).insertAfter($(mapFloatElem).children('.owner')[0]);
 }
 
+function recalculateAllianceOverlay() {
+    let mapContainerElem = angular.element(".map-container");
+    let scope = mapContainerElem.scope();
+    let worldMap = scope.WorldMap;
+    if (!worldMap.displayOptions.alliances || !worldMap.allianceData) return;
+
+    function drawRoomAllianceOverlay(roomName, left, top) {
+        let roomDiv = $('<div class="alliance-logo" id="' + roomName + '"></div>');
+        let roomStats = worldMap.roomStats[roomName];
+        if (roomStats && roomStats.own) {
+            let userName = worldMap.roomUsers[roomStats.own.user].username;
+            let allianceKey = worldMap.userAlliance[userName];
+            if (allianceKey) {
+                $(roomDiv).addClass('alliance-' + allianceKey);
+
+                $(roomDiv).removeClass("alliance-logo-1 alliance-logo-2 alliance-logo-3");
+                $(roomDiv).css('left', left);
+                $(roomDiv).css('top', top);
+                $(roomDiv).addClass("alliance-logo-" + worldMap.zoom);
+
+                $(mapContainerElem).append(roomDiv);
+            }
+        }
+    }
+
+    let $location = mapContainerElem.injector().get("$location");
+    if ($location.search().pos) {
+        let roomPixels;
+        let roomsPerSectorEdge;
+        switch (worldMap.zoom) {
+            case 1: { roomPixels = 20;  roomsPerSectorEdge = 10; break; }
+            case 2: { roomPixels = 50;  roomsPerSectorEdge =  4; break; }
+            case 3: { roomPixels = 150; roomsPerSectorEdge =  1; break; }
+        }
+
+        let posStr = $location.search().pos;
+        if (!posStr) return;
+
+        //if (worldMap.zoom !== 3) return; // Alliance images are pretty ugly at high zoom.
+
+        for (var u = 0; u < worldMap.sectors.length; u++) {
+            let sector = worldMap.sectors[u];
+            if (!sector || !sector.pos) continue;
+
+            if (worldMap.zoom === 3) {
+                // we're at zoom level 3, only render one room
+                drawRoomAllianceOverlay(sector.name, sector.left, sector.top);
+            } else if (sector.rooms) {
+                // high zoom, render a bunch of rooms
+                let rooms = sector.rooms.split(",");
+                for (let x = 0; x < roomsPerSectorEdge; x++) {
+                    for (let y = 0; y < roomsPerSectorEdge; y++) {
+                        let roomName = rooms[x * roomsPerSectorEdge + y];
+                        drawRoomAllianceOverlay(
+                            roomName,
+                            sector.left + x * roomPixels,
+                            sector.top + y * roomPixels);
+                    }
+                }
+            }
+        }
+    }
+}
+
+let pendingRedraws = 0;
+function addSectorAllianceOverlay() {
+    addStyle("\
+        .alliance-logo { position: absolute; z-index: 2; opacity: 0.4 }\
+        .alliance-logo-1 { width: 20px; height: 20px; }\
+        .alliance-logo-2 { width: 50px; height: 50px; }\
+        .alliance-logo-3 { width: 50px; height: 50px; background-size: 50px 50px; opacity: 0.8 }\
+    ");
+
+    let mapContainerElem = angular.element(".map-container");
+    let scope = mapContainerElem.scope();
+
+    let deferRecalculation = function () {
+        // remove alliance logos during redraws
+        $('.alliance-logo').remove();
+
+        pendingRedraws++;
+        setTimeout(() => {
+            pendingRedraws--;
+            if (pendingRedraws === 0) {
+                recalculateAllianceOverlay();
+            }
+        }, 500);
+    }
+    scope.$on("mapSectorsRecalced", deferRecalculation);
+    scope.$on("mapStatsUpdated", deferRecalculation);
+}
+
 // Entry point
 $(document).ready(() => {
     let app = angular.element(document.body);
@@ -161,6 +300,8 @@ $(document).ready(() => {
                 bindAllianceSetting();
                 addAllianceToggle();
                 addAllianceToInfoOverlay();
+
+                addSectorAllianceOverlay();
             });
         }
         tutorial._trigger(triggerName, unknownB);

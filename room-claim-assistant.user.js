@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name         Screeps room claim assistant
 // @namespace    https://screeps.com/
-// @version      0.1
+// @version      0.1.1
 // @author       James Cook
 // @include      https://screeps.com/a/
 // @run-at       document-ready
@@ -92,7 +92,7 @@ function recalculateClaimOverlay() {
                     
                     // show minerals if:
                     let showMinerals =
-                        userOwned || //  user owns it OR
+                        (userOwned && roomStats.own.level > 0) || //  user has claimed it OR
                         counts.s.length > 1; // it has 2+ sources
                     
                     let state = "not-recommended";

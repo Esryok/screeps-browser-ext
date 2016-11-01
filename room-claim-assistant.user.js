@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name         Screeps room claim assistant
 // @namespace    https://screeps.com/
-// @version      0.1.1
+// @version      0.1.2
 // @author       James Cook
 // @include      https://screeps.com/a/
 // @run-at       document-ready
@@ -79,7 +79,11 @@ function recalculateClaimOverlay() {
                 let roomName = sector.name;
                 let sectorDiv = angular.element($(objectsDiv).parent());
                 let roomStats = worldMap.roomStats[roomName];
-                if (!roomStats || roomStats.status === "out of borders") continue; // can't get the room objects for this, don't bother
+                if (!roomStats || roomStats.status === "out of borders") {
+                    // can't get the room objects for this, don't bother rendering anything
+                    $(sectorDiv).find('.claim-assist').remove();
+                    continue;
+                }
 
                 getRoomObjectCounts(roomName, (counts) => {
                     if (!counts) return;

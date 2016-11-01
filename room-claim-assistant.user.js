@@ -5,9 +5,10 @@
 // @namespace    https://screeps.com/
 // @version      0.1
 // @author       James Cook
-// @match        https://screeps.com/a/
+// @include      https://screeps.com/a/
 // @run-at       document-ready
 // @require      http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js
+// @downloadUrl  https://github.com/Esryok/screeps-browser-ext/raw/master/room-claim-assistant.user.js
 // ==/UserScript==
 
 function generateCompiledElement(parent, content) {
@@ -28,7 +29,6 @@ function addStyle(css) {
 
     head.appendChild(style);
 }
-
 
 let socket;
 let roomObjectCounts = {};

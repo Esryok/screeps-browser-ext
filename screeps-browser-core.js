@@ -26,14 +26,13 @@ window.ScreepsAdapter = {};
     let listeningToViewState = false;
     ScreepsAdapter.onViewChange = function (callback) {
         if (!listeningToViewState) {
-            let app = angular.element(document.body);
-            let tutorial = app.injector().get("Tutorial");
+            let tutorial = angular.element(document.body).injector().get("Tutorial");
             
             // intercept events as they are passed to the tutorial popup manager
-            var originalTutorialTrigger = tutorial.trigger;
+            tutorial._trigger = tutorial.trigger;
             tutorial.trigger = function(triggerName, unknownB) {
                 $(document).trigger("screeps:viewChange", triggerName);
-                originalTutorialTrigger(triggerName, unknownB);
+                tutorial._trigger(triggerName, unknownB);
             };
 
             listeningToViewState = true;

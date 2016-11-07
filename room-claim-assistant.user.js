@@ -3,34 +3,15 @@
 // ==UserScript==
 // @name         Screeps room claim assistant
 // @namespace    https://screeps.com/
-// @version      0.1.2
+// @version      0.1.3
 // @author       James Cook
 // @include      https://screeps.com/a/
 // @run-at       document-ready
 // @require      http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js
+// @require      https://github.com/Esryok/screeps-browser-ext/raw/master/screeps-browser-core.js
 // @downloadUrl  https://github.com/Esryok/screeps-browser-ext/raw/master/room-claim-assistant.user.js
 // ==/UserScript==
 
-function generateCompiledElement(parent, content) {
-    let $scope = parent.scope();
-    let $compile = parent.injector().get("$compile");
-
-    return $compile(content)($scope);
-}
-
-// inject a new CSS style
-function addStyle(css) {
-    let head = document.head;
-    if (!head) return;
-
-    let style = document.createElement('style');
-    style.type = 'text/css';
-    style.innerHTML = css;
-
-    head.appendChild(style);
-}
-
-let socket;
 let roomObjectCounts = {};
 function getRoomObjectCounts(roomName, callback) {
     let scope = angular.element(document.body).scope();
@@ -38,7 +19,7 @@ function getRoomObjectCounts(roomName, callback) {
         callback(roomObjectCounts[roomName]);
     } else {
         //console.log("Bind socket event", roomName)
-        let eventFunc = socket.bindEventToScope(scope, "roomMap2:" + roomName, function(objectCounts) {
+        let eventFunc = ScreepsAdapter.Socket.bindEventToScope(scope, "roomMap2:" + roomName, function(objectCounts) {
             roomObjectCounts[roomName] = objectCounts;
             eventFunc.remove();
             // console.log("Data loaded", roomName);
@@ -52,7 +33,7 @@ function interceptClaim0StatsRequest() {
     if (interceptingApiPost) return;
     interceptingApiPost = true;
 
-    let api = angular.element(document.body).injector().get('Api');
+    let api = ScreepsAdapter.Api;
     let post = api.post;
     api.post = (uri, body) => {
         //console.log("interceptClaim0StatsRequest", uri, body);
@@ -169,7 +150,7 @@ function bindMapStatsMonitor() {
 
 // Entry point
 $(document).ready(() => {
-    addStyle(`
+    DomHelper.addStyle(`
         .claim-assist { pointer-events: none; }
         .claim-assist.not-recommended { background: rgba(192, 192, 50, 0.3); }
         .claim-assist.recommended { background: rgba(25, 255, 25, 0.2); }
@@ -178,22 +159,10 @@ $(document).ready(() => {
         .room-prohibited { display: none; }
     `);
 
-    let app = angular.element(document.body);
-    let tutorial = app.injector().get("Tutorial");
-    let $timeout = angular.element('body').injector().get('$timeout');
-    
-    socket = app.injector().get('Socket');
-
-    // intercept viewer state changes
-    var originalTutorialTrigger = tutorial.trigger;
-    tutorial.trigger = function(triggerName, unknownB) {
-        // console.log("Room claim assistant trigger override", triggerName)
-        if (triggerName === "worldMapEntered") {
+    ScreepsAdapter.onViewChange(function(event, view) {
+        if (view === "worldMapEntered") {
             interceptClaim0StatsRequest();
-            $timeout(()=>{
-                bindMapStatsMonitor();
-            });
+            ScreepsAdapter.$timeout(bindMapStatsMonitor);
         }
-        originalTutorialTrigger(triggerName, unknownB);
-    };
+    });
 });

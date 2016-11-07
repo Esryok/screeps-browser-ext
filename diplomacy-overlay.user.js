@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name         Screeps diplomacy overlay
 // @namespace    https://screeps.com/
-// @version      0.2
+// @version      0.2.1
 // @author       James Cook
 // @include      https://screeps.com/a/
 // @run-at       document-ready
@@ -37,8 +37,8 @@ function generateColor(hue, saturation, lightness) {
     }
 }
 
-const zombieColor = [128, 128, 128];
 const userColor = [0, 255, 0];
+const zombieColor = [128, 128, 128];
 function hslToRGB(a, b, c) {
     0 > a && (a += 360);
     var d, e, f, g = (1 - Math.abs(2 * c - 1)) * b, h = a / 60, i = g * (1 - Math.abs(h % 2 - 1));
@@ -65,6 +65,25 @@ function hslToRGB(a, b, c) {
     [j, k, l]
 }
 
+function generateAndSetColor(userid, userName) {
+    let color;
+    let diplomacyScore;
+    if (diplomacyData.users && diplomacyData.users[userName]) {
+        diplomacyScore = diplomacyData.users[userName].state;
+    }
+
+    switch (diplomacyScore) {
+        case -1: color = generateColor(-15, .8, .4); break;
+        case  1: color = generateColor(210, .8, .5); break;
+
+        default:
+        case  0: color = generateColor(40, .8, .35); break;
+    }
+    colorMap[userid] = color;
+
+    return color;
+}
+
 function getColor(type) {
     let color = colorMap[type];
     if (!color) {
@@ -78,23 +97,11 @@ function getColor(type) {
         }
 
         if (!userMap[type]) {
-            return zombieColor;
+            return false;
         }
 
         let userName = userMap[type].username;
-        let diplomacyScore;
-        if (diplomacyData.users && diplomacyData.users[userName]) {
-            diplomacyScore = diplomacyData.users[userName].state;
-        }
-
-        switch (diplomacyScore) {
-            case -1: color = generateColor(-15, .8, .4); break;
-            case  1: color = generateColor(210, .8, .5); break;
-
-            default:
-            case  0: color = generateColor(40, .8, .35); break;
-        }
-        colorMap[type] = color;
+        color = generateAndSetColor(type, userName);
     }
     return color;
 }
@@ -134,8 +141,20 @@ function prepareRoomObjects(scope, element, roomName, mapScale) {
     element[0].listenerEvent = ScreepsAdapter.Socket.bindEventToScope(scope, "roomMap2:" + roomName, function(objects) {
         let image = graphics.createImageData(50 * mapScale, 50 * mapScale);
         if (objects) {
+            if (_.any(objects, (obj) => !getColor(obj.itemType)));
             _.forEach(objects, function(positions, itemType) {
-                colorPositions(image, positions, getColor(itemType), mapScale);
+                let color = getColor(itemType);
+                if (!color) {
+                    ScreepsAdapter.Api.get("user/find?id=" + itemType).then((data) => {
+                        if (getColor(itemType)) return; // someone already loaded this
+
+                        let userName = data.user.username;
+                        generateAndSetColor(itemType, userName);
+                    });
+                    colorPositions(image, positions, zombieColor, mapScale);
+                } else {
+                    colorPositions(image, positions, color, mapScale);
+                }
             });
         }
         graphics.putImageData(image, 0, 0);

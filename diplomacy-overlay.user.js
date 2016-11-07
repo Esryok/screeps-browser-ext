@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name         Screeps diplomacy overlay
 // @namespace    https://screeps.com/
-// @version      0.1.1
+// @version      0.2
 // @author       James Cook
 // @include      https://screeps.com/a/
 // @run-at       document-ready
@@ -68,10 +68,20 @@ function hslToRGB(a, b, c) {
 function getColor(type) {
     let color = colorMap[type];
     if (!color) {
-        let worldMap = angular.element('.world-map').scope().WorldMap;
-        if (!worldMap.roomUsers[type]) return zombieColor;
+        let userMap = {};
+        if (angular.element('.world-map').length) {
+            let worldMap = angular.element('.world-map').scope().WorldMap;
+            userMap = worldMap.roomUsers;
+        } else {
+            let room = angular.element('.room').scope().Room;
+            userMap = room.users;
+        }
 
-        let userName = worldMap.roomUsers[type].username;
+        if (!userMap[type]) {
+            return zombieColor;
+        }
+
+        let userName = userMap[type].username;
         let diplomacyScore;
         if (diplomacyData.users && diplomacyData.users[userName]) {
             diplomacyScore = diplomacyData.users[userName].state;
@@ -119,13 +129,13 @@ function ensureDiplomacyData(callback) {
     });
 }
 
-function prepareRoomObjects(scope, element, roomName) {
+function prepareRoomObjects(scope, element, roomName, mapScale) {
     let graphics = element[0].getContext("2d");
     element[0].listenerEvent = ScreepsAdapter.Socket.bindEventToScope(scope, "roomMap2:" + roomName, function(objects) {
-        let image = graphics.createImageData(150, 150);
+        let image = graphics.createImageData(50 * mapScale, 50 * mapScale);
         if (objects) {
             _.forEach(objects, function(positions, itemType) {
-                colorPositions(image, positions, getColor(itemType), 3);
+                colorPositions(image, positions, getColor(itemType), mapScale);
             });
         }
         graphics.putImageData(image, 0, 0);
@@ -134,11 +144,10 @@ function prepareRoomObjects(scope, element, roomName) {
     element[0].roomName = roomName;
 }
 
-function recalculateDiplomacyOverlay() {
+function recalculateWorldMapDiplomacyOverlay() {
     const content = `<canvas class='room-diplomacy-objects' height='150' width='150' map-scale='3'></canvas>`;
     
     let mapFloatElem = angular.element('.map-float-info');
-    let user = ScreepsAdapter.User._id;
     let mapContainerElem = angular.element('.map-container');
     let worldMap = mapContainerElem.scope().WorldMap;
 
@@ -155,19 +164,42 @@ function recalculateDiplomacyOverlay() {
                     element[0].listenerEvent.remove();
                     element[0].listenerEvent = null;
                 }
-                prepareRoomObjects(scope, element, sector.name);
+                prepareRoomObjects(scope, element, sector.name, 3);
             }
         } else {
             // create a new div
             element = $(content).appendTo(sectorElem);
-            prepareRoomObjects(scope, element, sector.name);
+            prepareRoomObjects(scope, element, sector.name, 3);
         }
+    }
+}
+
+let pendingWorldMapDiplomacyRedraws = 0;
+function deferWorldMapDiplomacyRedraw() {
+    let scope = angular.element(".map-container").scope();
+    let worldMap = scope.WorldMap;
+    
+    $('.room-diplomacy-objects').hide();
+    $('.room-diplomacy-objects').each((index, elem) => {
+        if (elem.listenerEvent) elem.listenerEvent.remove();
+        $(elem).remove();
+    });
+        
+    if (diplomacyData && worldMap.zoom === 3 && worldMap.displayOptions.diplomacyUnits) { 
+        pendingWorldMapDiplomacyRedraws++;
+        setTimeout(() => {
+            pendingWorldMapDiplomacyRedraws--;
+            if (pendingWorldMapDiplomacyRedraws === 0) {
+                recalculateWorldMapDiplomacyOverlay();
+                $('.room-diplomacy-objects').show();
+            }
+        }, 500);
     }
 }
 
 function replaceUnitsToggle() {
     let content = `
-        <md:button app-stop-click-propagation app-stop-propagation='mouseout mouseover mousemove'
+        <md:button id="#diplomacy-units" app-stop-click-propagation app-stop-propagation='mouseout mouseover mousemove'
             class='md-raised btn-units' ng-if='WorldMap.zoom == 3'
             ng:class="{'md-primary': WorldMap.displayOptions.diplomacyUnits}"
             ng:click='WorldMap.toggleDiplomacyUnits()' tooltip-placement='bottom' tooltip='Toggle units'>
@@ -188,49 +220,76 @@ function replaceUnitsToggle() {
     worldMap.toggleDiplomacyUnits = function () {
         worldMap.displayOptions.diplomacyUnits = !worldMap.displayOptions.diplomacyUnits;
         localStorage.setItem("diplomacyUnits", worldMap.displayOptions.diplomacyUnits);
-        redrawRoomStats();
+        deferWorldMapDiplomacyRedraw();
     };
 }
 
-function redrawRoomStats() {
-    let scope = angular.element(".map-container").scope();
-    let worldMap = scope.WorldMap;
-    
-    $('.room-diplomacy-objects').hide();
-    $('.room-diplomacy-objects').each((index, elem) => {
-        if (elem.listenerEvent) elem.listenerEvent.remove();
-        $(elem).remove();
-    });
-        
-    if (diplomacyData && worldMap.zoom === 3 && worldMap.displayOptions.diplomacyUnits) { 
-        pendingDiplomacyRedraws++;
-        setTimeout(() => {
-            pendingDiplomacyRedraws--;
-            if (pendingDiplomacyRedraws === 0) {
-                recalculateDiplomacyOverlay();
-                $('.room-diplomacy-objects').show();
-            }
-        }, 500);
-    }
-}
-
-let pendingDiplomacyRedraws = 0;
-function bindMapStatsMonitor() {
+function bindWorldMapStatsMonitor() {
     replaceUnitsToggle();
 
     let scope = angular.element(".map-container").scope();
     ensureDiplomacyData(() => {
-        scope.$on("mapSectorsRecalced", redrawRoomStats);
-        scope.$on("mapStatsUpdated", redrawRoomStats);
-        redrawRoomStats();
+        scope.$on("mapSectorsRecalced", deferWorldMapDiplomacyRedraw);
+        scope.$on("mapStatsUpdated", deferWorldMapDiplomacyRedraw);
+        deferWorldMapDiplomacyRedraw();
     });
+}
+
+function bindRoomStatsMonitor() {
+    const content = `<canvas class='room-diplomacy-objects' height='50' width='50' map-scale='1'></canvas>`;
+    $('.room-diplomacy-objects').remove();
+
+    function deferredMinimapOverlay() {
+        let minimapRoot = angular.element('.world-minimap');
+        if (minimapRoot.length) {
+            ensureDiplomacyData(() => {
+                let roomOverlays = $('.world-minimap canvas.room-objects');
+                for (let i = 0; i < roomOverlays.length; i++) {
+                    let roomOverlayElem = angular.element(roomOverlays[i]);
+                    let scope = roomOverlayElem.scope();
+                    let roomName = $(roomOverlayElem).attr("app:game-map-room-objects");
+                    
+                    let element = $(roomOverlayElem).parent().find('.room-diplomacy-objects');
+                    if (element.length) {
+                        if (element[0].roomName !== roomName) {
+                            if (element[0].listenerEvent) {
+                                element[0].listenerEvent.remove();
+                                element[0].listenerEvent = null;
+                            }
+                            prepareRoomObjects(scope, element, roomName, 1);
+                        }
+                    } else {
+                        // create a new div
+                        element = $(content).insertBefore(roomOverlayElem);
+                        prepareRoomObjects(scope, element, roomName, 1);
+                    }
+                }
+            });
+        } else {
+            setTimeout(deferredMinimapOverlay, 100);
+        }
+    }
+
+    setTimeout(deferredMinimapOverlay, 100);
 }
 
 // Entry point
 $(document).ready(() => {
+    DomHelper.addStyle(`
+        .room-objects { display: none; }
+    `);
+
     ScreepsAdapter.onViewChange(function(view) {
         if (view === "worldMapEntered") {
-            ScreepsAdapter.$timeout(bindMapStatsMonitor);
+            ScreepsAdapter.$timeout(bindWorldMapStatsMonitor);
+        }
+    });
+
+    let $routeParams = angular.element(document.body).injector().get("$routeParams");
+    let rootScope = angular.element(document.body).scope();
+    rootScope.$watch(() => $routeParams.room, (newVal, oldVal) => {
+        if (newVal) {
+            ScreepsAdapter.$timeout(bindRoomStatsMonitor);
         }
     });
 });

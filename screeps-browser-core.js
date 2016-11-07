@@ -1,4 +1,4 @@
-window.DomHelper = {};
+window.DomHelper = window.DomHelper || {};
 (function(DomHelper){
     DomHelper.addStyle = function (css) {
         let head = document.head;

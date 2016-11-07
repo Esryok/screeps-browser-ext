@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name         Screeps diplomacy overlay
 // @namespace    https://screeps.com/
-// @version      0.1
+// @version      0.1.1
 // @author       James Cook
 // @include      https://screeps.com/a/
 // @run-at       document-ready
@@ -228,7 +228,7 @@ function bindMapStatsMonitor() {
 
 // Entry point
 $(document).ready(() => {
-    ScreepsAdapter.onViewChange(function(event, view) {
+    ScreepsAdapter.onViewChange(function(view) {
         if (view === "worldMapEntered") {
             ScreepsAdapter.$timeout(bindMapStatsMonitor);
         }

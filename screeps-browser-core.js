@@ -18,44 +18,47 @@ window.DomHelper = {};
     }
 })(DomHelper);
 
-window.ScreepsAdapter = {};
-(function(ScreepsAdapter){
-
+window.ScreepsAdapter = window.ScreepsAdapter || {};
+(function(ScreepsAdapter) {
     // Listen for changes to the main screeps view
     // Examples: roomEntered, scriptClick, consoleClick, worldMapEntered, simulationMainMenu, gameLobby
-    let listeningToViewState = false;
     ScreepsAdapter.onViewChange = function (callback) {
-        if (!listeningToViewState) {
+        let rootScope = angular.element(document.body).scope();
+        if (!rootScope.viewChangeCallbacks) {
             let tutorial = angular.element(document.body).injector().get("Tutorial");
+            console.log("Overriding Tutorial.trigger");
             
             // intercept events as they are passed to the tutorial popup manager
             tutorial._trigger = tutorial.trigger;
             tutorial.trigger = function(triggerName, unknownB) {
-                $(document).trigger("screeps:viewChange", triggerName);
+                for (let i in rootScope.viewChangeCallbacks) {
+                    rootScope.viewChangeCallbacks[i](triggerName);
+                }
                 tutorial._trigger(triggerName, unknownB);
             };
 
-            listeningToViewState = true;
+            rootScope.viewChangeCallbacks = [];
         }
 
-        $(document).on("screeps:viewChange", callback)
+        rootScope.viewChangeCallbacks.push(callback);
     };
 
-    let lastHash;
-    let listeningToHashState = false;
     ScreepsAdapter.onHashChange = function (callback) {
-        if (!listeningToHashState) {
-            let app = angular.element(document.body);
-            app.scope().$on("routeSegmentChange", function() {
-                if (window.location.hash !== lastHash) {
-                    $(document).trigger("screeps:hashChange", window.location.hash);
+        let rootScope = angular.element(document.body).scope();
+        if (!rootScope.hashChangeCallbacks) {
+            rootScope.$on("routeSegmentChange", function() {
+                if (window.location.hash !== rootScope.lastHash) {
+                    for (let i in rootScope.hashChangeCallbacks) {
+                        rootScope.hashChangeCallbacks[i](window.location.hash);
+                    }
                 }
-                lastHash = window.location.hash;
+                rootScope.lastHash = window.location.hash;
             });
-            listeningToHashState = true;
+
+            rootScope.hashChangeCallbacks = [];
         }
 
-        $(document).on("screeps:hashChange", callback)
+        rootScope.hashChangeCallbacks.push(callback);
     }
 
     // aliases to angular services

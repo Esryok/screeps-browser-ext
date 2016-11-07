@@ -3,15 +3,18 @@
 // ==UserScript==
 // @name         Screeps alliance overlay
 // @namespace    https://screeps.com/
-// @version      0.2.5
+// @version      0.2.6
 // @author       James Cook
 // @include      https://screeps.com/a/
 // @run-at       document-ready
-// @downloadUrl  https://raw.githubusercontent.com/Esryok/screeps-browser-ext/master/alliance-overlay.user.js
+// @downloadUrl  https://raw.githubusercontent.com/LeagueOfAutomatedNations/loan-browser-ext/master/dist/alliance-overlay.user.js
 // @grant        GM_xmlhttpRequest
 // @require      http://ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js
+// @require      https://github.com/Esryok/screeps-browser-ext/raw/master/screeps-browser-core.js
 // @connect      www.leagueofautomatednations.com
 // ==/UserScript==
+
+// This is deprecated. Soon users will end up on the LOAN version (per downloadUrl), 'cause I'm tired of copy/pasting back and forth like a peasant.
 
 // Need to find some way to lock down these colors & permanently synchronize with LOAN. Store in DB?
 /* Palette configuration (http://jnnnnn.github.io/category-colors-constrained.html):
@@ -113,9 +116,10 @@ function generateCompiledElement(parent, content) {
 
 // Bind the WorldMap alliance display option to the localStorage value
 function bindAllianceSetting() {
-    let alliancesEnabled = localStorage.getItem("alliancesEnabled") === "true";
+    let alliancesEnabled = localStorage.getItem("alliancesEnabled") !== "false";
     let worldMapElem = angular.element($('.world-map'));
     let worldMap = worldMapElem.scope().WorldMap;
+
     worldMap.displayOptions.alliances = alliancesEnabled;
 
     worldMap.toggleAlliances = function () {
@@ -281,8 +285,6 @@ function addAllianceColumnToLeaderboard() {
             let rows = angular.element('.leaderboard table tr')
             let leaderboard = leaderboardScope.$parent.LeaderboardList;
 
-            let $timeout = angular.element('body').injector().get('$timeout');
-            
             ensureAllianceData(() => {
                 for (let i = 0; i < rows.length; i++) {
                     if (i === 0) {
@@ -309,16 +311,9 @@ function addAllianceColumnToLeaderboard() {
 
 // Entry point
 $(document).ready(() => {
-    let app = angular.element(document.body);
-    let tutorial = app.injector().get("Tutorial");
-    let $timeout = angular.element('body').injector().get('$timeout');
-
-    // intercept viewer state changes
-    tutorial._trigger = tutorial.trigger;
-    tutorial.trigger = function(triggerName, unknownB) {
-        console.log("Alliance overlay trigger override", triggerName)
-        if (triggerName === "worldMapEntered") {
-            $timeout(()=>{
+    ScreepsAdapter.onViewChange((event, view) => {
+        if (view === "worldMapEntered") {
+            ScreepsAdapter.$timeout(()=> {
                 bindAllianceSetting();
                 addAllianceToggle();
                 addAllianceToInfoOverlay();
@@ -326,20 +321,14 @@ $(document).ready(() => {
                 addSectorAllianceOverlay();
             });
         }
-        tutorial._trigger(triggerName, unknownB);
-    };
+    });
 
-    let lastHash;
-    let lastSearch;
-    app.scope().$on("routeSegmentChange", function() {
-        if (window.location.hash && window.location.hash !== lastHash) {
-            var match = window.location.hash.match(/#!\/(.+?)\//);
-            if (match && match.length > 1 && match[1] === "rank") {
-                let search = app.injector().get("$location").search();
-                if (search.page) addAllianceColumnToLeaderboard();
-            }
+    ScreepsAdapter.onHashChange(function(event, hash) {
+        var match = hash.match(/#!\/(.+?)\//);
+        if (match && match.length > 1 && match[1] === "rank") {
+            let app = angular.element(document.body);
+            let search = app.injector().get("$location").search();
+            if (search.page) addAllianceColumnToLeaderboard();
         }
-
-        lastHash = window.location.hash;
     });
 });

@@ -304,11 +304,5 @@ $(document).ready(() => {
         }
     });
 
-    let $routeParams = angular.element(document.body).injector().get("$routeParams");
-    let rootScope = angular.element(document.body).scope();
-    rootScope.$watch(() => $routeParams.room, (newVal, oldVal) => {
-        if (newVal) {
-            ScreepsAdapter.$timeout(bindRoomStatsMonitor);
-        }
-    });
+    ScreepsAdapter.onRoomChange(bindRoomStatsMonitor);
 });

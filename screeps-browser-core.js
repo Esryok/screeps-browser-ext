@@ -46,20 +46,37 @@ window.ScreepsAdapter = window.ScreepsAdapter || {};
     ScreepsAdapter.onHashChange = function (callback) {
         let rootScope = angular.element(document.body).scope();
         if (!rootScope.hashChangeCallbacks) {
-            rootScope.$on("routeSegmentChange", function() {
-                if (window.location.hash !== rootScope.lastHash) {
-                    for (let i in rootScope.hashChangeCallbacks) {
-                        rootScope.hashChangeCallbacks[i](window.location.hash);
-                    }
+            rootScope.$watch(() => window.location.hash, function(newVal, oldVal) {
+                for (let i in rootScope.hashChangeCallbacks) {
+                    rootScope.hashChangeCallbacks[i](window.location.hash);
                 }
-                rootScope.lastHash = window.location.hash;
             });
 
             rootScope.hashChangeCallbacks = [];
         }
 
         rootScope.hashChangeCallbacks.push(callback);
-    }
+    };
+    
+    ScreepsAdapter.onRoomChange = function (callback) {
+        let $routeParams = angular.element(document.body).injector().get("$routeParams");
+        let rootScope = angular.element(document.body).scope();
+        if (!rootScope.roomChangeCallbacks) {
+            ScreepsAdapter.onHashChange((hash) => {
+                let room = $routeParams.room;
+                if (room !== rootScope.lastRoom) {
+                    for (let i in rootScope.roomChangeCallbacks) {
+                        rootScope.roomChangeCallbacks[i](room);
+                    }
+                    rootScope.lastRoom = room;
+                }
+            });
+
+            rootScope.roomChangeCallbacks = [];
+        }
+
+        rootScope.roomChangeCallbacks.push(callback);
+    };
 
     // aliases to angular services
     Object.defineProperty(ScreepsAdapter, "User", {

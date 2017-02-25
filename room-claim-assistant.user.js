@@ -84,6 +84,8 @@ function recalculateClaimOverlay() {
                     state = "owned";
                 } else if (roomStats.own && !userOwned) {
                     state = "prohibited";
+                } else if (roomStats.sign && !userOwned) {
+                    state = "signed";
                 } else if (counts.c.length === 0) {
                     state = "unclaimable";
                 } else if (counts.s.length >= 2 &&
@@ -153,6 +155,7 @@ $(document).ready(() => {
         .claim-assist.not-recommended { background: rgba(192, 192, 50, 0.3); }
         .claim-assist.recommended { background: rgba(25, 255, 25, 0.2); }
         .claim-assist.owned { background: rgba(50, 50, 255, 0.2); }
+        .claim-assist.signed { background: rgba(255, 128, 0, 0.35); }
         .claim-assist.prohibited { background: rgba(255, 50, 50, 0.2); }
         .room-prohibited { display: none; }
     `);

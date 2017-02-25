@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name         Screeps room claim assistant
 // @namespace    https://screeps.com/
-// @version      0.1.4
+// @version      0.1.5
 // @author       James Cook
 // @include      https://screeps.com/a/
 // @run-at       document-ready

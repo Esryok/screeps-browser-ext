@@ -84,7 +84,7 @@ function recalculateClaimOverlay() {
                     state = "owned";
                 } else if (roomStats.own && !userOwned) {
                     state = "prohibited";
-                } else if (roomStats.sign && !userOwned) {
+                } else if (roomStats.sign && !userOwned && roomStats.sign.user !== user._id) {
                     state = "signed";
                 } else if (counts.c.length === 0) {
                     state = "unclaimable";

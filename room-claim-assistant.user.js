@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name         Screeps room claim assistant
 // @namespace    https://screeps.com/
-// @version      0.1.5
+// @version      0.1.6
 // @author       James Cook
 // @include      https://screeps.com/a/
 // @run-at       document-ready
@@ -13,13 +13,13 @@
 // ==/UserScript==
 
 let roomObjectCounts = {};
-function getRoomObjectCounts(roomName, callback) {
+function getRoomObjectCounts(shardName, roomName, callback) {
     let scope = angular.element(document.body).scope();
     if (roomObjectCounts[roomName]) {
         callback(roomObjectCounts[roomName]);
     } else {
         //console.log("Bind socket event", roomName)
-        let eventFunc = ScreepsAdapter.Socket.bindEventToScope(scope, "roomMap2:" + roomName, function(objectCounts) {
+        let eventFunc = ScreepsAdapter.Socket.bindEventToScope(scope, `roomMap2:${shardName}/${roomName}`, function(objectCounts) {
             roomObjectCounts[roomName] = objectCounts;
             eventFunc.remove();
             // console.log("Data loaded", roomName);
@@ -65,7 +65,7 @@ function recalculateClaimOverlay() {
                 continue;
             }
 
-            getRoomObjectCounts(roomName, (counts) => {
+            getRoomObjectCounts(worldMap.shard, roomName, (counts) => {
                 if (!counts) return;
                 if (!counts.s) {
                     console.log("Bad object list for". roomName, counts)

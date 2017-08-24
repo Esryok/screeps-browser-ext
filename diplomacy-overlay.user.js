@@ -3,7 +3,7 @@
 // ==UserScript==
 // @name         Screeps diplomacy overlay
 // @namespace    https://screeps.com/
-// @version      0.2.1
+// @version      0.2.2
 // @author       James Cook
 // @include      https://screeps.com/a/
 // @run-at       document-ready
@@ -136,9 +136,9 @@ function ensureDiplomacyData(callback) {
     });
 }
 
-function prepareRoomObjects(scope, element, roomName, mapScale) {
+function prepareRoomObjects(scope, element, roomHandle, mapScale) {
     let graphics = element[0].getContext("2d");
-    element[0].listenerEvent = ScreepsAdapter.Socket.bindEventToScope(scope, "roomMap2:" + roomName, function(objects) {
+    element[0].listenerEvent = ScreepsAdapter.Socket.bindEventToScope(scope, `roomMap2:${roomHandle}`, function(objects) {
         let image = graphics.createImageData(50 * mapScale, 50 * mapScale);
         if (objects) {
             if (_.any(objects, (obj) => !getColor(obj.itemType)));
@@ -160,7 +160,7 @@ function prepareRoomObjects(scope, element, roomName, mapScale) {
         graphics.putImageData(image, 0, 0);
     })
 
-    element[0].roomName = roomName;
+    element[0].roomHandle = roomHandle;
 }
 
 function recalculateWorldMapDiplomacyOverlay() {
@@ -175,20 +175,21 @@ function recalculateWorldMapDiplomacyOverlay() {
         let sectorElem = angular.element(mapSectors[i]);
         let scope = sectorElem.scope();
         let sector = scope.$parent.sector;
+        let roomHandle = worldMap.shard + "/" + sector.name;
 
         let element = $(sectorElem).find('.room-diplomacy-objects');
         if (element.length) {
-            if (element[0].roomName !== sector.name) {
+            if (element[0].roomHandle !== roomHandle) {
                 if (element[0].listenerEvent) {
                     element[0].listenerEvent.remove();
                     element[0].listenerEvent = null;
                 }
-                prepareRoomObjects(scope, element, sector.name, 3);
+                prepareRoomObjects(scope, element, roomHandle, 3);
             }
         } else {
             // create a new div
             element = $(content).appendTo(sectorElem);
-            prepareRoomObjects(scope, element, sector.name, 3);
+            prepareRoomObjects(scope, element, roomHandle, 3);
         }
     }
 }
@@ -266,21 +267,21 @@ function bindRoomStatsMonitor() {
                 for (let i = 0; i < roomOverlays.length; i++) {
                     let roomOverlayElem = angular.element(roomOverlays[i]);
                     let scope = roomOverlayElem.scope();
-                    let roomName = $(roomOverlayElem).attr("app:game-map-room-objects");
+                    let roomHandle = $(roomOverlayElem).attr("app:game-map-room-objects");
                     
                     let element = $(roomOverlayElem).parent().find('.room-diplomacy-objects');
                     if (element.length) {
-                        if (element[0].roomName !== roomName) {
+                        if (element[0].roomHandle !== roomHandle) {
                             if (element[0].listenerEvent) {
                                 element[0].listenerEvent.remove();
                                 element[0].listenerEvent = null;
                             }
-                            prepareRoomObjects(scope, element, roomName, 1);
+                            prepareRoomObjects(scope, element, roomHandle, 1);
                         }
                     } else {
                         // create a new div
                         element = $(content).insertBefore(roomOverlayElem);
-                        prepareRoomObjects(scope, element, roomName, 1);
+                        prepareRoomObjects(scope, element, roomHandle, 1);
                     }
                 }
             });

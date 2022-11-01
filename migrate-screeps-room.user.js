@@ -3,9 +3,9 @@
 // @namespace    https://screeps.com/
 // @version      1.4
 // @author       Mark Bertels, Esryok
-// @match        https://screeps.com/a/#!/sim/custom
 // @run-at       context-menu
 // @grant        none
+// @match        https://*/*
 // ==/UserScript==
 
 function applyTerrain(terrain) {
@@ -38,6 +38,9 @@ function adjustRoomDataForCustomMode(roomData) {
         let object = roomData.objects[index];
         if (object.nextRegenerationTime)
             object.nextRegenerationTime = Math.max(1, object.nextRegenerationTime - currentTime);
+        
+        if (object.cooldownTime)
+            object.cooldownTime = Math.max(1, object.cooldownTime - currentTime);
             
         if (object.nextDecayTime)
             object.nextDecayTime = Math.max(1, object.nextDecayTime - currentTime);
